@@ -1,0 +1,879 @@
+// App.js 
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { AuthProvider } from './context/AuthContext';
+import HomeScreen from './screens/HomeScreen';
+import LoginScreen from './screens/LoginScreen';
+import RegisterScreen from './screens/RegisterScreen';
+import ServiceRequestScreen from './screens/ServiceRequestScreen';
+import WorkerDashboardScreen from './screens/WorkerDashboardScreen';
+import UserDashboardScreen from './screens/UserDashboardScreen';
+import ProfileScreen from './screens/ProfileScreen';
+import BidScreen from './screens/BidScreen';
+
+const Stack = createStackNavigator();
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <NavigationContainer>
+        <Stack.Navigator initialRouteName="Home">
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="ServiceRequest" component={ServiceRequestScreen} />
+          <Stack.Screen name="WorkerDashboard" component={WorkerDashboardScreen} />
+          <Stack.Screen name="UserDashboard" component={UserDashboardScreen} />
+          <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="Bid" component={BidScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </AuthProvider>
+  );
+}
+ 
+// index.js 
+import { registerRootComponent } from 'expo';
+
+import App from './App';
+
+// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
+// It also ensures that whether you load the app in Expo Go or in a native build,
+// the environment is set up appropriately
+registerRootComponent(App);
+ 
+// app.json 
+{
+  "expo": {
+    "name": "HelpingPartnerApp",
+    "slug": "HelpingPartnerApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
+ 
+// package.json 
+{
+  "name": "helpingpartnerapp",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-navigation/native": "^7.1.18",
+    "@react-navigation/stack": "^7.4.10",
+    "expo": "~54.0.13",
+    "expo-image-picker": "^17.0.8",
+    "expo-location": "^19.0.7",
+    "expo-status-bar": "~3.0.8",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.4",
+    "react-native-safe-area-context": "^5.6.1",
+    "react-native-screens": "^4.16.0",
+    "react-native-web": "^0.21.0"
+  },
+  "private": true
+}
+ 
+// TODO.md 
+# Helping Partner App Development TODO
+
+## Project Setup (Completed)
+- [x] Initialize Expo React Native project
+- [x] Install core dependencies (navigation, storage, image picker, location)
+- [x] Basic App.js with navigation skeleton
+
+## 1. Project Structure
+- [x] Create directories: screens/, components/, utils/, mocks/, context/
+
+## 2. Mock Data
+- [x] Create utils/mocks.js: Sample users (customers/workers), requests, bids, reviews
+
+## 3. Authentication
+- [x] Create context/AuthContext.js: Manage user state, role (customer/worker), login/logout
+- [x] Create screens/HomeScreen.js: Welcome, buttons to Login/Register
+- [x] Create screens/LoginScreen.js: Email/password form, role selection, navigate to dashboard
+- [x] Create screens/RegisterScreen.js: Signup form with role, store user locally
+- [x] Update App.js: Wrap with AuthProvider, conditional routing (auth vs. home)
+
+## 4. Customer Features
+- [x] Create screens/UserDashboardScreen.js: List posted requests, button to post new
+- [x] Create screens/PostRequestScreen.js: Form (description, category, price, location via Expo Location), save to mock/local
+- [ ] Create screens/ViewRequestsScreen.js: View active requests with bids, accept bid
+- [ ] Create screens/ReviewsScreen.js: After job, submit review (stars, comment), update worker rank
+
+## 5. Worker Features
+- [x] Create screens/WorkerDashboardScreen.js: List available requests, bid/accept buttons
+- [x] Create screens/BidScreen.js: Enter bid price, submit to request
+- [ ] Create screens/JobCompletionScreen.js: Upload photos (Expo ImagePicker), mark complete, notify customer
+
+## 6. Shared Features
+- [x] Create screens/ProfileScreen.js: View profile, reviews list, calculated rank (avg reviews)
+- [x] Implement rank calculation in utils (average stars)
+
+## 7. Integrations
+- [ ] Install Firebase: expo install firebase (for auth, Firestore, Storage)
+- [ ] Setup Firebase config (need user API keys)
+- [ ] Replace mocks with Firebase: Auth, real-time requests/bids, photo upload to Storage
+- [ ] Add permissions for location/image in app.json
+
+## 8. Testing & Build
+- [ ] Test navigation and basic flows: expo start --web / android
+- [ ] Verify features: Post request, bid, photo upload, review, rank update
+- [ ] Build APK: expo build:android (or EAS for iOS)
+- [ ] Full testing on devices via Expo Go
+
+## Notes
+- Start with mock data for prototype.
+- Ranks: Simple average of review stars (e.g., 4.5/5).
+- UI: Use basic React Native components; add styles as needed.
+- Backend: Firebase for scalability; real-time subscriptions for bids.
+ 
+// context/AuthContext.js 
+import React, { createContext, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mockUsers } from '../utils/mocks';
+
+export const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    // Load user from storage on app start
+    const loadUser = async () => {
+      const storedUser = await AsyncStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    };
+    loadUser();
+  }, []);
+
+  const login = async (email, password, role) => {
+    // Mock login: find user by email and role
+    const foundUser = mockUsers.find(u => u.email === email && u.role === role);
+    if (foundUser) {
+      setUser(foundUser);
+      await AsyncStorage.setItem('user', JSON.stringify(foundUser));
+      return true;
+    }
+    return false;
+  };
+
+  const register = async (email, password, name, role) => {
+    // Mock register: add new user
+    const newUser = {
+      id: mockUsers.length + 1,
+      email,
+      role,
+      name,
+    };
+    mockUsers.push(newUser);
+    setUser(newUser);
+    await AsyncStorage.setItem('user', JSON.stringify(newUser));
+    return true;
+  };
+
+  const logout = async () => {
+    setUser(null);
+    await AsyncStorage.removeItem('user');
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, register, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+ 
+// screens/BidScreen.js 
+import React, { useState, useContext } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { AuthContext } from '../context/AuthContext';
+
+export default function BidScreen({ route, navigation }) {
+  const { request } = route.params;
+  const [bidPrice, setBidPrice] = useState(request.initialPrice.toString());
+  const { user } = useContext(AuthContext);
+
+  const handleBid = () => {
+    const price = parseFloat(bidPrice);
+    if (isNaN(price) || price <= 0) {
+      Alert.alert('Error', 'Enter a valid price');
+      return;
+    }
+
+    // Add bid to mock data
+    const newBid = {
+      id: request.bids.length + 1,
+      workerId: user.id,
+      price,
+      accepted: false,
+    };
+    request.bids.push(newBid);
+
+    Alert.alert('Success', 'Bid submitted!');
+    navigation.goBack();
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Bid on Request</Text>
+      <Text>{request.description}</Text>
+      <Text>Initial Price: {request.initialPrice} EUR</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Your Bid (EUR)"
+        value={bidPrice}
+        onChangeText={setBidPrice}
+        keyboardType="numeric"
+      />
+      <Button title="Submit Bid" onPress={handleBid} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    marginBottom: 20,
+    borderRadius: 5,
+  },
+});
+ 
+// screens/HomeScreen.js 
+import React from 'react';
+import { View, Text, Button, StyleSheet } from 'react-native';
+
+export default function HomeScreen({ navigation }) {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Helping Partner</Text>
+      <Text style={styles.subtitle}>Connect with local service providers</Text>
+      <Button title="Login" onPress={() => navigation.navigate('Login')} />
+      <Button title="Register" onPress={() => navigation.navigate('Register')} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 16,
+    marginBottom: 20,
+  },
+});
+ 
+// screens/LoginScreen.js 
+import React, { useState, useContext } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, Alert, Picker } from 'react-native';
+import { AuthContext } from '../context/AuthContext';
+
+export default function LoginScreen({ navigation }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('customer');
+  const { login } = useContext(AuthContext);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
+    const success = await login(email, password, role);
+    if (success) {
+      // Navigate to dashboard based on role
+      if (role === 'customer') {
+        navigation.navigate('UserDashboard');
+      } else {
+        navigation.navigate('WorkerDashboard');
+      }
+    } else {
+      Alert.alert('Error', 'Invalid credentials');
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Login</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+      <Text style={styles.label}>Role:</Text>
+      <Picker
+        selectedValue={role}
+        style={styles.picker}
+        onValueChange={(itemValue) => setRole(itemValue)}
+      >
+        <Picker.Item label="Customer" value="customer" />
+        <Picker.Item label="Worker" value="worker" />
+      </Picker>
+      <Button title="Login" onPress={handleLogin} />
+      <Button title="Go to Register" onPress={() => navigation.navigate('Register')} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+  label: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  picker: {
+    height: 50,
+    width: '100%',
+    marginBottom: 20,
+  },
+});
+ 
+// screens/ProfileScreen.js 
+import React, { useContext } from 'react';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { AuthContext } from '../context/AuthContext';
+import { mockReviews, calculateRank } from '../utils/mocks';
+
+export default function ProfileScreen() {
+  const { user } = useContext(AuthContext);
+
+  const userReviews = mockReviews.filter(r => r.workerId === user.id);
+  const rank = calculateRank(user.id);
+
+  const renderReview = ({ item }) => (
+    <View style={styles.reviewItem}>
+      <Text>Stars: {item.stars}/5</Text>
+      <Text>{item.comment}</Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Profile</Text>
+      <Text>Name: {user.name}</Text>
+      <Text>Email: {user.email}</Text>
+      <Text>Role: {user.role}</Text>
+      {user.role === 'worker' && (
+        <>
+          <Text>Rank: {rank.toFixed(1)}/5</Text>
+          <Text style={styles.subtitle}>Reviews:</Text>
+          <FlatList
+            data={userReviews}
+            renderItem={renderReview}
+            keyExtractor={(item) => item.id.toString()}
+          />
+        </>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  subtitle: {
+    fontSize: 18,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  reviewItem: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+});
+ 
+// screens/RegisterScreen.js 
+import React, { useState, useContext } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, Alert, Picker } from 'react-native';
+import { AuthContext } from '../context/AuthContext';
+
+export default function RegisterScreen({ navigation }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('customer');
+  const { register } = useContext(AuthContext);
+
+  const handleRegister = async () => {
+    if (!email || !password || !name) {
+      Alert.alert('Error', 'Please fill all fields');
+      return;
+    }
+    const success = await register(email, password, name, role);
+    if (success) {
+      // Navigate to dashboard based on role
+      if (role === 'customer') {
+        navigation.navigate('UserDashboard');
+      } else {
+        navigation.navigate('WorkerDashboard');
+      }
+    } else {
+      Alert.alert('Error', 'Registration failed');
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Register</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Name"
+        value={name}
+        onChangeText={setName}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+      <Text style={styles.label}>Role:</Text>
+      <Picker
+        selectedValue={role}
+        style={styles.picker}
+        onValueChange={(itemValue) => setRole(itemValue)}
+      >
+        <Picker.Item label="Customer" value="customer" />
+        <Picker.Item label="Worker" value="worker" />
+      </Picker>
+      <Button title="Register" onPress={handleRegister} />
+      <Button title="Go to Login" onPress={() => navigation.navigate('Login')} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+  label: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  picker: {
+    height: 50,
+    width: '100%',
+    marginBottom: 20,
+  },
+});
+ 
+// screens/ServiceRequestScreen.js 
+import React, { useState, useContext } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, Alert, Picker } from 'react-native';
+import * as Location from 'expo-location';
+import { AuthContext } from '../context/AuthContext';
+import { mockRequests } from '../utils/mocks';
+
+export default function ServiceRequestScreen({ navigation }) {
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('carpenter');
+  const [initialPrice, setInitialPrice] = useState('');
+  const { user } = useContext(AuthContext);
+
+  const handleSubmit = async () => {
+    if (!description || !initialPrice) {
+      Alert.alert('Error', 'Please fill all fields');
+      return;
+    }
+
+    // Get location
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission denied', 'Location permission is required');
+      return;
+    }
+    let location = await Location.getCurrentPositionAsync({});
+
+    // Add to mock requests
+    const newRequest = {
+      id: mockRequests.length + 1,
+      description,
+      category,
+      initialPrice: parseFloat(initialPrice),
+      location: {
+        lat: location.coords.latitude,
+        lng: location.coords.longitude,
+      },
+      customerId: user.id,
+      status: 'open',
+      bids: [],
+    };
+    mockRequests.push(newRequest);
+
+    Alert.alert('Success', 'Request posted!');
+    navigation.goBack();
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Post Service Request</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Description (e.g., Broken door)"
+        value={description}
+        onChangeText={setDescription}
+        multiline
+      />
+      <Text style={styles.label}>Category:</Text>
+      <Picker
+        selectedValue={category}
+        style={styles.picker}
+        onValueChange={(itemValue) => setCategory(itemValue)}
+      >
+        <Picker.Item label="Carpenter" value="carpenter" />
+        <Picker.Item label="Plumber" value="plumber" />
+        <Picker.Item label="Electrician" value="electrician" />
+      </Picker>
+      <TextInput
+        style={styles.input}
+        placeholder="Initial Price (EUR)"
+        value={initialPrice}
+        onChangeText={setInitialPrice}
+        keyboardType="numeric"
+      />
+      <Button title="Post Request" onPress={handleSubmit} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+  label: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  picker: {
+    height: 50,
+    width: '100%',
+    marginBottom: 20,
+  },
+});
+ 
+// screens/UserDashboardScreen.js 
+import React, { useContext } from 'react';
+import { View, Text, Button, StyleSheet, FlatList } from 'react-native';
+import { AuthContext } from '../context/AuthContext';
+import { mockRequests } from '../utils/mocks';
+
+export default function UserDashboardScreen({ navigation }) {
+  const { user, logout } = useContext(AuthContext);
+
+  const userRequests = mockRequests.filter(r => r.customerId === user.id);
+
+  const renderRequest = ({ item }) => (
+    <View style={styles.requestItem}>
+      <Text>{item.description}</Text>
+      <Text>Price: {item.initialPrice} EUR</Text>
+      <Text>Status: {item.status}</Text>
+      <Text>Bids: {item.bids.length}</Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Customer Dashboard</Text>
+      <Text>Welcome, {user.name}!</Text>
+      <Button title="Post New Request" onPress={() => navigation.navigate('ServiceRequest')} />
+      <Text style={styles.subtitle}>Your Requests:</Text>
+      <FlatList
+        data={userRequests}
+        renderItem={renderRequest}
+        keyExtractor={(item) => item.id.toString()}
+      />
+      <Button title="Logout" onPress={logout} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 18,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  requestItem: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+});
+ 
+// screens/WorkerDashboardScreen.js 
+import React, { useContext } from 'react';
+import { View, Text, Button, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { AuthContext } from '../context/AuthContext';
+import { mockRequests } from '../utils/mocks';
+
+export default function WorkerDashboardScreen({ navigation }) {
+  const { user, logout } = useContext(AuthContext);
+
+  const availableRequests = mockRequests.filter(r => r.status === 'open');
+
+  const renderRequest = ({ item }) => (
+    <TouchableOpacity
+      style={styles.requestItem}
+      onPress={() => navigation.navigate('Bid', { request: item })}
+    >
+      <Text>{item.description}</Text>
+      <Text>Price: {item.initialPrice} EUR</Text>
+      <Text>Category: {item.category}</Text>
+      <Text>Bids: {item.bids.length}</Text>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Worker Dashboard</Text>
+      <Text>Welcome, {user.name}! Rank: {user.rank || 0}</Text>
+      <Text style={styles.subtitle}>Available Requests:</Text>
+      <FlatList
+        data={availableRequests}
+        renderItem={renderRequest}
+        keyExtractor={(item) => item.id.toString()}
+      />
+      <Button title="View Profile" onPress={() => navigation.navigate('Profile')} />
+      <Button title="Logout" onPress={logout} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 18,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  requestItem: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+});
+ 
+// utils/mocks.js 
+export const mockUsers = [
+  {
+    id: 1,
+    email: 'customer@example.com',
+    role: 'customer',
+    name: 'John Doe',
+  },
+  {
+    id: 2,
+    email: 'worker@example.com',
+    role: 'worker',
+    name: 'Jane Carpenter',
+    rank: 4.5, // Average from reviews
+  },
+  {
+    id: 3,
+    email: 'anotherworker@example.com',
+    role: 'worker',
+    name: 'Bob Plumber',
+    rank: 4.0,
+  },
+];
+
+export const mockRequests = [
+  {
+    id: 1,
+    description: 'Broken door needs repair',
+    category: 'carpenter',
+    initialPrice: 15,
+    location: { lat: 52.5200, lng: 13.4050 }, // Berlin coords
+    customerId: 1,
+    status: 'open',
+    bids: [
+      { id: 1, workerId: 2, price: 15, accepted: false },
+      { id: 2, workerId: 3, price: 20, accepted: false },
+    ],
+  },
+  {
+    id: 2,
+    description: 'Install new shelf',
+    category: 'carpenter',
+    initialPrice: 25,
+    location: { lat: 52.5200, lng: 13.4050 },
+    customerId: 1,
+    status: 'accepted',
+    bids: [
+      { id: 3, workerId: 2, price: 25, accepted: true },
+    ],
+  },
+];
+
+export const mockReviews = [
+  {
+    id: 1,
+    requestId: 2,
+    reviewerId: 1,
+    workerId: 2,
+    stars: 5,
+    comment: 'Great job, fast and reliable!',
+  },
+  {
+    id: 2,
+    requestId: 1,
+    reviewerId: 1,
+    workerId: 3,
+    stars: 4,
+    comment: 'Good work, but a bit expensive.',
+  },
+];
+
+// Function to calculate rank (average stars for worker)
+export const calculateRank = (workerId) => {
+  const reviews = mockReviews.filter(r => r.workerId === workerId);
+  if (reviews.length === 0) return 0;
+  return reviews.reduce((sum, r) => sum + r.stars, 0) / reviews.length;
+};
+ 
